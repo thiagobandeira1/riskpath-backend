@@ -14,14 +14,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
+from app.error_handlers import register_exception_handlers
 from app.routers import examples, health, metadata, predictions
-from app.schemas import APIError, ApiErrorDetail, ErrorResponse
 
 # Permissive dev CORS, per spec.md Decisions Log #1. Tightened Saturday morning
 # once the frontend stack is picked. Covers the standard dev ports for the
@@ -75,22 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(predictions.router)
     app.include_router(examples.router)
 
-    # Minimal handler so all 422s match the documented ErrorResponse shape
-    # (needed by the alignment tests in tests/test_feature_alignment.py).
-    # Task 11 will move this to a dedicated module + add a 500 handler.
-    @app.exception_handler(RequestValidationError)
-    async def _validation_exception_handler(
-        request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
-        body = ErrorResponse(
-            error=ApiErrorDetail(
-                code=APIError.VALIDATION_ERROR,
-                message="Request validation failed",
-                details={"errors": jsonable_encoder(exc.errors())},
-            ),
-        )
-        return JSONResponse(status_code=422, content=jsonable_encoder(body))
-
+    register_exception_handlers(app)
     return app
 
 
