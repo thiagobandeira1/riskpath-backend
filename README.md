@@ -35,9 +35,27 @@ Hospital Predictive Model App/
 ├── notebooks/
 │   └── Capstone_Final_Notebook.ipynb     # Reference notebook (for design context)
 │
-├── app/                                  # (empty) Streamlit / FastAPI app goes here
+├── app/                                  # FastAPI backend (see "Running the backend" below)
+│   ├── main.py                           #   App factory + CORS + lifespan
+│   ├── dependencies.py                   #   Predictor singleton
+│   ├── error_handlers.py                 #   Unified 422 / 500 → ErrorResponse
+│   ├── serialization.py                  #   numpy → JSON helpers
+│   ├── routers/                          #   /health, /metadata, /predictions[/batch],
+│   │                                     #     /explanations, /examples
+│   └── schemas/                          #   Pydantic features / responses / errors
+│
+├── tests/                                # pytest suite (61 tests, ~4 s)
+│   ├── conftest.py                       #   Fixtures: client, sample_patients
+│   ├── test_feature_alignment.py         #   6 NON-NEGOTIABLE alignment gates
+│   ├── test_examples.py                  #   PHI guard + endpoint contract
+│   ├── test_explanations.py              #   SHAP shape + additivity
+│   ├── test_metadata.py                  #   Feature schema + model info
+│   ├── test_predictions.py               #   Single + batch
+│   └── test_errors.py                    #   422 / 500 envelope shape + traceback no-leak
 │
 ├── verify_model.py                       # End-to-end inference + SHAP sanity check
+├── spec.md                               # Backend spec (the gated source of truth)
+├── plan.md                               # 14-task implementation plan + checkpoints
 ├── requirements.txt
 ├── .gitignore                            # Excludes data/ so MIMIC never leaks if you init git
 └── README.md                             # (this file)
@@ -158,10 +176,73 @@ shap_out = predictor.explain(df)
   Conda environment for the XGBoost path only (Python 3.12.10, scikit-learn
   1.8.0, XGBoost 3.2.0, SHAP 0.51.0).
 
+## Running the backend
+
+The FastAPI backend wraps `src.inference.ReadmissionPredictor` behind 5 HTTP
+endpoints. Design + scope live in [`spec.md`](spec.md); the implementation
+plan lives in [`plan.md`](plan.md).
+
+```powershell
+# 1. Activate the venv (every new shell)
+.\venv\Scripts\Activate.ps1
+
+# 2. Start the dev server with hot-reload on file change
+uvicorn app.main:app --reload --port 8000
+
+# Browse:
+#   http://127.0.0.1:8000/docs            # Swagger UI — try-it-out enabled
+#   http://127.0.0.1:8000/openapi.json    # Machine-readable schema
+#   http://127.0.0.1:8000/health          # Liveness probe
+```
+
+Startup is ~2 s (model load + LabelEncoder fit + SHAP TreeExplainer build,
+all pre-warmed via `lifespan`).
+
+### Endpoints
+
+| Method | Path                  | Purpose |
+|--------|-----------------------|---------|
+| GET    | `/health`             | Liveness — returns model identifier, no model load |
+| GET    | `/metadata`           | Feature schema + categorical levels + numeric stats + model info |
+| GET    | `/examples?n=N`       | N anonymized rows (1-100) ready to POST. ID columns never read into memory. |
+| POST   | `/predictions`        | Single patient → probability + binary prediction (`?threshold=0.5` query param) |
+| POST   | `/predictions/batch`  | Up to 100 patients per request, single XGBoost forward pass |
+| POST   | `/explanations`       | SHAP contributions per feature (log-odds) + base value + probability |
+
+Every 4xx/5xx response uses the same `ErrorResponse` envelope:
+`{"error": {"code": "VALIDATION_ERROR" | "INTERNAL_ERROR", "message": "...", "details": {...}}}`.
+
+### Running the test suite
+
+```powershell
+# Full suite (~4 s, 58 tests + 3 intentional skips)
+pytest tests/ -v
+
+# Just the 6 non-negotiable feature-alignment gates
+pytest tests/test_feature_alignment.py -v
+
+# Re-verify model layer hasn't regressed (run before each demo)
+python verify_model.py
+```
+
+### Pre-demo checklist
+
+Before showing the backend to anyone:
+
+```powershell
+python verify_model.py             # 1. Model still scores at AUROC 0.7929
+pytest tests/                       # 2. All 58 tests green, including the 6 alignment gates
+uvicorn app.main:app --port 8000    # 3. Dev server up, /docs reachable
+```
+
+If any of those three fail, **do not demo**.
+
 ## Status
 
-**This folder is NOT git-initialized.** It is a local-only working directory.
-Before you ever run `git init` here, re-read the `.gitignore` and verify
-`data/` is excluded.
+**This folder is git-initialized locally (no remote).** All MIMIC-derived
+data in `data/` is gitignored. Before adding a GitHub remote, re-audit
+`.gitignore` and run `git status` to confirm no patient data has been
+accidentally staged.
 
 Built 2026-05-17 from the publication repo's V17-validated artefacts.
+Backend built 2026-05-17 against `spec.md` / `plan.md`.
