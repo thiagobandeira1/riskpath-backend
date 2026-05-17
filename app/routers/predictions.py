@@ -21,9 +21,11 @@ from app.dependencies import get_predictor
 from app.schemas import (
     BatchPredictionRequest,
     BatchPredictionResponse,
+    ExplanationResponse,
     PatientFeatures,
     PredictionResponse,
 )
+from app.serialization import ndarray_to_list
 from src.inference import ReadmissionPredictor
 from src.schema import CATEGORICAL_COLS, FEATURE_COLS
 
@@ -129,3 +131,40 @@ def predict_batch(
         for i, p in enumerate(probas)
     ]
     return BatchPredictionResponse(predictions=predictions)
+
+
+@router.post(
+    "/explanations",
+    response_model=ExplanationResponse,
+    summary="SHAP explanation for a single patient prediction",
+    description=(
+        "Returns per-feature SHAP contributions (in log-odds units) toward "
+        "the positive class, the model expected value (base_value), the "
+        "post-encoding feature values that went into the model, and the "
+        "predicted probability. sum(shap_values) + base_value equals the "
+        "model logit; sigmoid(.) of that equals the probability."
+    ),
+)
+def explain_single(
+    features: PatientFeatures,
+    predictor: Annotated[ReadmissionPredictor, Depends(get_predictor)],
+) -> ExplanationResponse:
+    df = features.to_dataframe()
+    warnings = _detect_fallback_warnings(df, predictor)
+
+    shap_out = predictor.explain(df)
+    # shap_values shape: (1, 50). Extract the row as a flat list.
+    shap_row = ndarray_to_list(shap_out["shap_values"][0])
+    # X_transformed: (1, 50) DataFrame in FEATURE_COLS order.
+    x_row = ndarray_to_list(shap_out["X_transformed"].iloc[0].to_numpy())
+
+    proba = float(predictor.predict_proba(df)[0])
+
+    return ExplanationResponse(
+        shap_values=shap_row,
+        base_value=float(shap_out["base_value"]),
+        feature_names=list(shap_out["feature_names"]),
+        feature_values_transformed=x_row,
+        probability=proba,
+        fallback_warnings=warnings,
+    )

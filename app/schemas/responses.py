@@ -94,12 +94,13 @@ class ExplanationResponse(BaseModel):
         ...,
         description="Names of the 50 features, in canonical training order.",
     )
-    feature_values_transformed: list[float] = Field(
+    feature_values_transformed: list[float | None] = Field(
         ...,
         description=(
             "The post-encoding values that went into the model (categoricals "
-            "as integers). Same length and order as shap_values. Useful for "
-            "rendering a waterfall chart with hover-over values."
+            "as integers). Same length and order as shap_values. None entries "
+            "correspond to numeric features the patient was missing (NaN at "
+            "scoring time) — render as 'missing' in the waterfall."
         ),
     )
     probability: float = Field(

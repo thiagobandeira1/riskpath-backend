@@ -38,10 +38,16 @@ _DEV_ORIGINS: list[str] = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Pre-warm the predictor so the first request doesn't pay the ~3 s load."""
+    """Pre-warm predictor + SHAP explainer so the first request is fast."""
+    import shap
+
     from app.dependencies import get_predictor
 
-    get_predictor()
+    predictor = get_predictor()
+    # The TreeExplainer is otherwise lazy-built on first /explanations call
+    # (per src/inference.py:68). Pre-building costs ~50 ms but keeps first-
+    # request latency under the 2 s SHAP SLO.
+    predictor._explainer = shap.TreeExplainer(predictor.model)
     yield
 
 
