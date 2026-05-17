@@ -22,6 +22,14 @@ from fastapi.responses import JSONResponse
 
 from app.schemas import APIError, ApiErrorDetail, ErrorResponse
 
+# Reusable `responses=` dict for endpoint decorators. Documents the
+# ErrorResponse shape for 422 + 500 in OpenAPI so consumers see the error
+# contract alongside the success contract.
+ERROR_RESPONSES: dict = {
+    422: {"model": ErrorResponse, "description": "Request validation failed."},
+    500: {"model": ErrorResponse, "description": "Internal server error."},
+}
+
 _logger = logging.getLogger("uvicorn")
 
 

@@ -18,6 +18,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies import get_predictor
+from app.error_handlers import ERROR_RESPONSES
 from app.schemas import (
     BatchPredictionRequest,
     BatchPredictionResponse,
@@ -61,6 +62,7 @@ def _detect_fallback_warnings(
 @router.post(
     "/predictions",
     response_model=PredictionResponse,
+    responses=ERROR_RESPONSES,
     summary="30-day readmission probability + binary prediction (single patient)",
     description=(
         "Returns the predicted probability of 30-day readmission and the "
@@ -98,6 +100,7 @@ def predict_single(
 @router.post(
     "/predictions/batch",
     response_model=BatchPredictionResponse,
+    responses=ERROR_RESPONSES,
     summary="30-day readmission predictions (1-100 patients per call)",
     description=(
         "Batched version of POST /predictions. The full batch is scored in "
@@ -136,6 +139,7 @@ def predict_batch(
 @router.post(
     "/explanations",
     response_model=ExplanationResponse,
+    responses=ERROR_RESPONSES,
     summary="SHAP explanation for a single patient prediction",
     description=(
         "Returns per-feature SHAP contributions (in log-odds units) toward "

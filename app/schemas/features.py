@@ -82,6 +82,16 @@ PatientFeatures.__doc__ = (
     "type, value range, and (for categoricals) the list of known levels."
 )
 
+# JSON-schema example for /docs "Try it out". Synthetic placeholders only —
+# we never embed real MIMIC values in source for DUA compliance. The
+# "EXAMPLE" categoricals will trigger fallback warnings on submission,
+# which is actually useful to demonstrate that feature.
+PatientFeatures.model_config["json_schema_extra"] = {
+    "examples": [
+        {c: ("EXAMPLE" if c in _CATEGORICAL else 0.0) for c in FEATURE_COLS}
+    ]
+}
+
 
 MAX_BATCH_SIZE = 100
 

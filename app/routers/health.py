@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.error_handlers import ERROR_RESPONSES
+
 router = APIRouter(tags=["health"])
 
 _DEPLOYED_MODEL_ID = "xgboost-v7-seed0"
@@ -24,6 +26,7 @@ class HealthResponse(BaseModel):
 @router.get(
     "/health",
     response_model=HealthResponse,
+    responses={500: ERROR_RESPONSES[500]},
     summary="Liveness probe",
     description="Returns 200 with the deployed model identifier. No model loading, no DB.",
 )

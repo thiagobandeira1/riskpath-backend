@@ -20,6 +20,7 @@ from typing import Annotated
 import pandas as pd
 from fastapi import APIRouter, Query
 
+from app.error_handlers import ERROR_RESPONSES
 from app.schemas import ExamplesResponse, PatientFeatures
 from src.schema import CATEGORICAL_COLS, FEATURE_COLS
 
@@ -54,6 +55,7 @@ def _row_to_patient_features(row: pd.Series) -> PatientFeatures:
 @router.get(
     "/examples",
     response_model=ExamplesResponse,
+    responses=ERROR_RESPONSES,
     summary="Anonymized example patient rows for demo loading",
     description=(
         "Returns N anonymized rows drawn from the local V7 parquet, each "

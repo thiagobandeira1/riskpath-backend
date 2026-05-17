@@ -19,6 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_predictor
+from app.error_handlers import ERROR_RESPONSES
 from app.schemas import FeatureMetadata, MetadataResponse, ModelMetadata
 from src.inference import ReadmissionPredictor
 from src.schema import CATEGORICAL_COLS, FEATURE_COLS
@@ -60,6 +61,7 @@ def _load_summary() -> dict:
 @router.get(
     "/metadata",
     response_model=MetadataResponse,
+    responses={500: ERROR_RESPONSES[500]},
     summary="Feature schema + model info",
     description=(
         "Returns the 50 V7 features (with categorical levels or numeric "
