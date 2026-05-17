@@ -81,3 +81,23 @@ PatientFeatures.__doc__ = (
     "Single patient's 50 V7 feature values. See /metadata for per-feature "
     "type, value range, and (for categoricals) the list of known levels."
 )
+
+
+MAX_BATCH_SIZE = 100
+
+
+class BatchPredictionRequest(BaseModel):
+    """Request body for POST /predictions/batch (1-100 patients per call)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    patients: list[PatientFeatures] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_SIZE,
+        description=(
+            f"List of patient feature objects (1-{MAX_BATCH_SIZE} per request). "
+            "SHAP latency grows linearly; the cap protects the per-request "
+            "latency target."
+        ),
+    )

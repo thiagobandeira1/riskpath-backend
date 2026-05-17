@@ -18,9 +18,14 @@ import pandas as pd
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies import get_predictor
-from app.schemas import PatientFeatures, PredictionResponse
+from app.schemas import (
+    BatchPredictionRequest,
+    BatchPredictionResponse,
+    PatientFeatures,
+    PredictionResponse,
+)
 from src.inference import ReadmissionPredictor
-from src.schema import CATEGORICAL_COLS
+from src.schema import CATEGORICAL_COLS, FEATURE_COLS
 
 router = APIRouter(tags=["predictions"])
 
@@ -86,3 +91,41 @@ def predict_single(
         threshold=threshold,
         fallback_warnings=warnings,
     )
+
+
+@router.post(
+    "/predictions/batch",
+    response_model=BatchPredictionResponse,
+    summary="30-day readmission predictions (1-100 patients per call)",
+    description=(
+        "Batched version of POST /predictions. The full batch is scored in "
+        "a single XGBoost forward pass, so per-patient overhead is much "
+        "lower than calling /predictions N times. Cap is 100 patients "
+        "per request to keep per-request latency bounded."
+    ),
+)
+def predict_batch(
+    request: BatchPredictionRequest,
+    predictor: Annotated[ReadmissionPredictor, Depends(get_predictor)],
+    threshold: Annotated[
+        float,
+        Query(ge=0.0, le=1.0, description="Decision threshold applied to every patient."),
+    ] = 0.5,
+) -> BatchPredictionResponse:
+    # Build one multi-row DataFrame so we do a single forward pass.
+    df = pd.concat(
+        [pf.to_dataframe() for pf in request.patients], ignore_index=True
+    )
+    df = df[FEATURE_COLS]  # belt-and-braces: enforce canonical order
+
+    probas = predictor.predict_proba(df)
+    predictions = [
+        PredictionResponse(
+            probability=float(p),
+            prediction=int(p >= threshold),
+            threshold=threshold,
+            fallback_warnings=_detect_fallback_warnings(df.iloc[[i]], predictor),
+        )
+        for i, p in enumerate(probas)
+    ]
+    return BatchPredictionResponse(predictions=predictions)
