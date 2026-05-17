@@ -34,3 +34,14 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# --- Frontend: TEMPORARY EXCLUSION during stack evaluation ------------
+# Multiple frontend attempts (Claude Design, Lovable, etc.) land here
+# while we pick a winner. Keeps experiments out of git history so the
+# backend log stays clean. When the winner is picked, REMOVE this block
+# and commit ./frontend/ as a single labeled slice. At that point also
+# add the Node-specific paths back:
+#   frontend/node_modules/
+#   frontend/dist/
+#   frontend/.vite/
+frontend/
