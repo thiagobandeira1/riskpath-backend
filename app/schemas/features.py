@@ -37,9 +37,19 @@ class _StrictBase(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Return this row as a 1-row DataFrame with columns in FEATURE_COLS order."""
+        """Return this row as a 1-row DataFrame ready for the predictor.
+
+        Numeric columns are explicitly cast to float64 so None becomes NaN
+        rather than leaving the column as object dtype — XGBoost rejects
+        object-dtype numeric columns with `KeyError: 'object'`.
+        Categorical columns stay as object/str; preprocess.transform applies
+        the LabelEncoder.
+        """
         row = self.model_dump()
-        return pd.DataFrame([{c: row[c] for c in FEATURE_COLS}], columns=FEATURE_COLS)
+        df = pd.DataFrame([{c: row[c] for c in FEATURE_COLS}], columns=FEATURE_COLS)
+        numeric_cols = [c for c in FEATURE_COLS if c not in _CATEGORICAL]
+        df[numeric_cols] = df[numeric_cols].astype("float64")
+        return df
 
 
 def _build_field_defs() -> dict[str, tuple[type, object]]:
