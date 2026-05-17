@@ -34,7 +34,10 @@ _DEV_ORIGINS: list[str] = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """App lifespan. Task 3 will pre-warm the predictor here."""
+    """Pre-warm the predictor so the first request doesn't pay the ~3 s load."""
+    from app.dependencies import get_predictor
+
+    get_predictor()
     yield
 
 
