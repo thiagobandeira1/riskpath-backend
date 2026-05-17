@@ -20,7 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.routers import health, metadata, predictions
+from app.routers import examples, health, metadata, predictions
 from app.schemas import APIError, ApiErrorDetail, ErrorResponse
 
 # Permissive dev CORS, per spec.md Decisions Log #1. Tightened Saturday morning
@@ -73,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(metadata.router)
     app.include_router(predictions.router)
+    app.include_router(examples.router)
 
     # Minimal handler so all 422s match the documented ErrorResponse shape
     # (needed by the alignment tests in tests/test_feature_alignment.py).
