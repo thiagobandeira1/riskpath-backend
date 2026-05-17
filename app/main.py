@@ -20,8 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.error_handlers import register_exception_handlers
 from app.routers import examples, health, metadata, predictions
 
-# Permissive dev CORS, per spec.md Decisions Log #1. Tightened Saturday morning
-# once the frontend stack is picked. Covers the standard dev ports for the
+# Permissive dev CORS, per spec.md Decisions Log #1. Tightened once the
+# frontend stack is finalized. Covers the standard dev ports for the
 # three frontends we might pick (React-Vite, Next/CRA, Streamlit).
 _DEV_ORIGINS: list[str] = [
     "http://localhost:3000",   # Next.js / CRA
@@ -31,6 +31,10 @@ _DEV_ORIGINS: list[str] = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8501",
 ]
+
+# Claude Design hosts each prototype at https://<project-uuid>.claudeusercontent.com.
+# Regex covers any UUID so we don't need to update CORS per project.
+_CLAUDEUSERCONTENT_REGEX = r"https://[\w-]+\.claudeusercontent\.com$"
 
 
 @asynccontextmanager
@@ -63,6 +67,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_DEV_ORIGINS,
+        allow_origin_regex=_CLAUDEUSERCONTENT_REGEX,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
