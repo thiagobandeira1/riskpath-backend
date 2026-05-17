@@ -45,3 +45,11 @@ dist/
 #   frontend/dist/
 #   frontend/.vite/
 frontend/
+
+# --- Regenerable / DUA-sensitive artifacts at project root ------------
+# openapi.json: regenerable via `python -c "..." > openapi.json`.
+# example_payload.json: contains ONE real MIMIC-derived patient row
+#   (used to brief Claude Design / Lovable on the request shape).
+#   The PhysioNet DUA prohibits redistribution — MUST stay local.
+openapi.json
+example_payload.json
