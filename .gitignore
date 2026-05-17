@@ -1,0 +1,36 @@
+# --- Data ---------------------------------------------------------------
+# The MIMIC-IV-derived parquet files in data/ are research data subject to
+# the PhysioNet Data Use Agreement. They MUST NEVER be committed to a
+# public repository. If you ever `git init` this folder, double-check this
+# rule survives.
+data/
+
+# --- Python -------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.ipynb_checkpoints/
+
+# --- Virtual environments ----------------------------------------------
+venv/
+.venv/
+env/
+.env
+
+# --- Editors / OS ------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Optional: exclude large model artefacts ---------------------------
+# Uncomment if model files grow too large for the repo, OR if they should
+# be re-downloaded from a model registry instead of being version-controlled.
+# model/*.pkl
+# model/*.joblib
+
+# --- Build / package artefacts ----------------------------------------
+build/
+dist/
+*.egg-info/

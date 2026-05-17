@@ -1,0 +1,34 @@
+{
+  "models": {
+    "lightgbm": {
+      "val_auroc": 0.8141308092742061,
+      "test_auroc": 0.7969948974807559
+    },
+    "xgboost": {
+      "val_auroc": 0.8107024757525589,
+      "test_auroc": 0.7935365087783612
+    },
+    "catboost": {
+      "val_auroc": 0.8080827778077988,
+      "test_auroc": 0.7937380077844418
+    },
+    "histgbm": {
+      "val_auroc": 0.8112935925840411,
+      "test_auroc": 0.7943094855120514
+    }
+  },
+  "n_seeds": 10,
+  "random_state": 42,
+  "test_size": 0.2,
+  "val_size": 0.1,
+  "blend": {
+    "weights": {
+      "lightgbm": 0.769230769230769,
+      "xgboost": 0.07692307692307691,
+      "catboost": 0.07692307692307697,
+      "histgbm": 0.07692307692307691
+    },
+    "val_auroc": 0.8136802727437967,
+    "test_auroc": 0.7967611425419676
+  }
+}
