@@ -11,8 +11,15 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"
+# Intentionally NO startCommand here — Railway would pass it directly to
+# the container without shell expansion, so `${PORT:-8000}` arrives as a
+# literal string and uvicorn rejects it ("Invalid value for '--port'").
+# The Dockerfile's CMD uses `sh -c` which DOES expand ${PORT}, and Railway
+# falls back to the Dockerfile CMD when startCommand is omitted.
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+# Generous timeout for the first /health hit: lifespan loads the predictor
+# (~3 s) + pre-builds the SHAP TreeExplainer (~50 ms) before the app
+# accepts traffic. 60 s leaves headroom for cold parquet I/O on slow disks.
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
