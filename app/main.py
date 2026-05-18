@@ -11,11 +11,13 @@ Run:
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, Response
 
 from app.error_handlers import register_exception_handlers
 from app.routers import examples, health, metadata, predictions
@@ -25,16 +27,26 @@ from app.routers import examples, health, metadata, predictions
 # three frontends we might pick (React-Vite, Next/CRA, Streamlit).
 _DEV_ORIGINS: list[str] = [
     "http://localhost:3000",   # Next.js / CRA
-    "http://localhost:5173",   # Vite
+    "http://localhost:5173",   # Vite default
+    "http://localhost:8080",   # @lovable.dev/vite-tanstack-config default (what RiskPath uses)
     "http://localhost:8501",   # Streamlit
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
     "http://127.0.0.1:8501",
 ]
 
 # Claude Design hosts each prototype at https://<project-uuid>.claudeusercontent.com.
 # Regex covers any UUID so we don't need to update CORS per project.
 _CLAUDEUSERCONTENT_REGEX = r"https://[\w-]+\.claudeusercontent\.com$"
+
+# Lovable hosted previews live at https://<project-name>.lovable.app and
+# Cloudflare Workers / Pages at https://*.<account>.workers.dev or a custom
+# subdomain. Allow both shapes; tightened to specific origins via the
+# ALLOWED_ORIGINS env var (comma-separated) once a final deploy URL is chosen.
+_PROD_ORIGIN_REGEX = (
+    r"https://([\w-]+\.)?(lovable\.app|workers\.dev|pages\.dev|riskpath\.app)$"
+)
 
 
 @asynccontextmanager
@@ -52,6 +64,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def _resolve_cors(app: FastAPI) -> None:
+    """Configure CORS from env vars (prod) with fallback to dev allowlist.
+
+    ALLOWED_ORIGINS env var (comma-separated) is the prod allowlist. When set,
+    it REPLACES the dev allowlist. The regex still allows Lovable/Workers
+    preview URLs unless ALLOWED_ORIGIN_REGEX is also explicitly set.
+    """
+    env_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+    if env_origins:
+        origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+    else:
+        origins = _DEV_ORIGINS
+
+    env_regex = os.environ.get(
+        "ALLOWED_ORIGIN_REGEX",
+        f"({_CLAUDEUSERCONTENT_REGEX[:-1]}|{_PROD_ORIGIN_REGEX[1:]})",
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_origin_regex=env_regex,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
+
+
 def create_app() -> FastAPI:
     """Construct and configure the FastAPI application."""
     app = FastAPI(
@@ -64,14 +104,22 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_DEV_ORIGINS,
-        allow_origin_regex=_CLAUDEUSERCONTENT_REGEX,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["*"],
-    )
+    _resolve_cors(app)
+
+    # DUA mitigation: prevent search-engine indexing of every response.
+    # Combined with /robots.txt below, this keeps the backend out of search
+    # results so the MIMIC-derived /examples payload isn't crawler-surfaced.
+    @app.middleware("http")
+    async def add_no_index_header(request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return response
+
+    @app.get("/robots.txt", include_in_schema=False)
+    def robots_txt() -> PlainTextResponse:
+        """Forbid all crawling — DUA mitigation, not a security control."""
+        return PlainTextResponse("User-agent: *\nDisallow: /\n")
+
     app.include_router(health.router)
     app.include_router(metadata.router)
     app.include_router(predictions.router)

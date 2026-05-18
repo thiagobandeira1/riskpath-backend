@@ -20,6 +20,7 @@ The six tests, per spec.md §Testing Strategy:
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -30,6 +31,9 @@ from sklearn.metrics import roc_auc_score
 from app.dependencies import get_predictor
 from app.schemas.features import PatientFeatures
 from src.schema import CATEGORICAL_COLS, FEATURE_COLS, TARGET_COL
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_TRAIN_PARQUET = _PROJECT_ROOT / "data" / "processed" / "training_table_v7.parquet"
 
 
 def _row_to_dict(row: pd.Series) -> dict[str, object]:
@@ -169,6 +173,10 @@ def test_unseen_categorical_value_handled(
 # Alignment test 6
 # ───────────────────────────────────────────────────────────────────────
 
+@pytest.mark.skipif(
+    not _TRAIN_PARQUET.exists(),
+    reason="Requires the local V7 parquet (DUA-restricted; absent in deploy builds).",
+)
 def test_full_test_set_auroc_matches_inference(client: TestClient) -> None:
     """HTTP path is mathematically equivalent to ReadmissionPredictor across
     a sizeable test slice.

@@ -1,0 +1,18 @@
+# Railway service config. Auto-detected on every push to the connected branch.
+#
+# - We rely on the Dockerfile for build (Nixpacks is skipped when a Dockerfile
+#   is present at the repo root).
+# - Health check path matches the FastAPI /health endpoint.
+# - Restart policy: ON_FAILURE with a small max so a broken deploy fails loud
+#   instead of silently retrying forever.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

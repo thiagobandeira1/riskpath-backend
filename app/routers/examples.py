@@ -28,13 +28,24 @@ router = APIRouter(tags=["examples"])
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _TRAINING_PARQUET = _PROJECT_ROOT / "data" / "processed" / "training_table_v7.parquet"
+# Pre-baked pool of 100 anonymized rows (FEATURE_COLS only). Created by
+# scripts/freeze_deploy_artifacts.py. When this pickle exists, /examples
+# samples from it instead of reading the 25 MB parquet — keeps the deployed
+# image slim and avoids shipping the full MIMIC-derived training table.
+_DEPLOY_POOL = _PROJECT_ROOT / "model" / "deploy_examples_pool.pkl"
 
 _MAX_N = 100
 
 
 @lru_cache(maxsize=1)
 def _load_examples_pool() -> pd.DataFrame:
-    """Load the V7 parquet, FEATURE_COLS ONLY — ID_COLS never read into memory."""
+    """Load FEATURE_COLS-only rows; ID_COLS never read into memory.
+
+    Prefers the pre-baked pool pickle (deploy path); falls back to the
+    parquet if the pickle is absent (local-dev path).
+    """
+    if _DEPLOY_POOL.exists():
+        return pd.read_pickle(_DEPLOY_POOL)
     return pd.read_parquet(_TRAINING_PARQUET, columns=FEATURE_COLS)
 
 

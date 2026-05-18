@@ -1,0 +1,55 @@
+# Keep the build context lean and never let MIMIC-derived parquet or local
+# dev artifacts slip into the image.
+
+# DUA-protected data (never ships)
+data/
+
+# Local venv (massive; not what the container uses anyway)
+venv/
+.venv/
+env/
+
+# Python caches
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+*.so
+
+# Frontend (lives in its own repo / deploy target)
+frontend/
+
+# Notebooks + research scaffolding (not part of the deployed surface)
+notebooks/
+
+# Test suite + dev-only fixtures
+tests/
+
+# Specs + plans + readme (informational, not runtime)
+README.md
+spec.md
+plan.md
+example_payload.json
+openapi.json
+verify_model.py
+
+# Editor + OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Git + CI metadata
+.git/
+.gitignore
+.github/
+
+# Dockerfile + dockerignore themselves are fine to ship but no need
+# (Docker excludes the dockerfile from the context root automatically only
+# when using BuildKit; explicit exclusion is harmless).
+Dockerfile
+.dockerignore
+
+# Railway / platform configs travel with the build context but aren't needed
+# at runtime in the image.
+railway.toml
