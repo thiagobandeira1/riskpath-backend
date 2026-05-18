@@ -28,8 +28,12 @@ RUN apt-get update \
 
 WORKDIR /build
 COPY requirements.txt .
-RUN pip install --prefix=/install --upgrade pip \
-    && pip install --prefix=/install -r requirements.txt
+# Use `python -m pip` rather than `pip` directly. The bare `pip` script lives
+# in /usr/local/bin and was getting clobbered when we tried `pip install
+# --upgrade pip --prefix=/install` (uninstalled the system pip, installed the
+# new one outside PATH → `pip: not found`). `python -m pip` always works
+# because Python finds the module via sys.path regardless of where pip lives.
+RUN python -m pip install --prefix=/install -r requirements.txt
 
 # ───────────────────────── runtime stage ─────────────────────────────
 FROM python:3.11-slim AS runtime
