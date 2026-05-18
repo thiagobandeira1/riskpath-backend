@@ -36,16 +36,23 @@ _DEV_ORIGINS: list[str] = [
     "http://127.0.0.1:8501",
 ]
 
-# Claude Design hosts each prototype at https://<project-uuid>.claudeusercontent.com.
-# Regex covers any UUID so we don't need to update CORS per project.
-_CLAUDEUSERCONTENT_REGEX = r"https://[\w-]+\.claudeusercontent\.com$"
-
-# Lovable hosted previews live at https://<project-name>.lovable.app and
-# Cloudflare Workers / Pages at https://*.<account>.workers.dev or a custom
-# subdomain. Allow both shapes; tightened to specific origins via the
-# ALLOWED_ORIGINS env var (comma-separated) once a final deploy URL is chosen.
-_PROD_ORIGIN_REGEX = (
-    r"https://([\w-]+\.)?(lovable\.app|workers\.dev|pages\.dev|riskpath\.app)$"
+# Default allowed-origin regex. Single regex covers every host shape we ship
+# previews on, so we don't have to compose multiple regexes at startup (the
+# previous compose-via-string-slicing approach silently dropped the leading 'h'
+# from "https://" — every Lovable origin was being matched against "ttps://..."
+# and CORS preflights failed). Override with ALLOWED_ORIGIN_REGEX env var if
+# you tighten this for a specific deploy.
+#
+# Matches:
+#   https://<uuid>.claudeusercontent.com           (Claude Design previews)
+#   https://riskpath-clinician-companion.lovable.app  (Lovable hosted previews)
+#   https://<name>.workers.dev / *.pages.dev       (Cloudflare Workers/Pages)
+#   https://*.riskpath.app                         (future custom domain)
+_DEFAULT_ALLOWED_ORIGIN_REGEX = (
+    r"https://("
+    r"[\w-]+\.claudeusercontent\.com|"
+    r"([\w-]+\.)?(lovable\.app|workers\.dev|pages\.dev|riskpath\.app)"
+    r")$"
 )
 
 
@@ -77,10 +84,7 @@ def _resolve_cors(app: FastAPI) -> None:
     else:
         origins = _DEV_ORIGINS
 
-    env_regex = os.environ.get(
-        "ALLOWED_ORIGIN_REGEX",
-        f"({_CLAUDEUSERCONTENT_REGEX[:-1]}|{_PROD_ORIGIN_REGEX[1:]})",
-    )
+    env_regex = os.environ.get("ALLOWED_ORIGIN_REGEX", _DEFAULT_ALLOWED_ORIGIN_REGEX)
 
     app.add_middleware(
         CORSMiddleware,
