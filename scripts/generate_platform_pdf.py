@@ -126,6 +126,22 @@ _STYLES = {
         spaceAfter=2,
         textColor=_INK,
     ),
+    # Blockquote — used for the verbatim "SAY" talking points the presenter
+    # reads aloud. Tinted background so they pop on the page and are easy to
+    # find at a glance during the demo.
+    "quote": ParagraphStyle(
+        "Quote",
+        fontName=_BODY_FONT_ITALIC,
+        fontSize=11,
+        leading=16,
+        leftIndent=14,
+        rightIndent=10,
+        spaceBefore=4,
+        spaceAfter=8,
+        textColor=HexColor("#2A1A4A"),
+        backColor=HexColor("#F4F0FA"),
+        borderPadding=(6, 8, 6, 10),
+    ),
 }
 
 
@@ -239,6 +255,19 @@ def _is_block_marker(line: str) -> bool:
     return False
 
 
+def _collect_blockquote(lines: list[str], start: int) -> tuple[str, int]:
+    """Collect a `> `-prefixed blockquote (the verbatim 'SAY' talking points)."""
+    buf: list[str] = []
+    i = start
+    while i < len(lines) and lines[i].lstrip().startswith("> "):
+        buf.append(lines[i].lstrip()[2:].rstrip())
+        i += 1
+    # blank line(s) inside a quote -> stop; advance at least one to be safe
+    if i == start:
+        i = start + 1
+    return " ".join(buf), i
+
+
 def _collect_paragraph(lines: list[str], start: int) -> tuple[str, int]:
     """Collect a paragraph (consecutive non-empty, non-special lines)."""
     buf: list[str] = []
@@ -349,6 +378,13 @@ def _parse_markdown(md_text: str) -> list:
             i += 1
             continue
 
+        # blockquote (the verbatim "SAY" talking points)
+        if line.lstrip().startswith("> "):
+            quote, new_i = _collect_blockquote(lines, i)
+            flow.append(Paragraph(_inline(quote), _STYLES["quote"]))
+            i = new_i
+            continue
+
         # table
         tbl, new_i = _parse_table(lines, i)
         if tbl is not None:
@@ -397,38 +433,73 @@ def _parse_markdown(md_text: str) -> list:
 
 
 # ───────────────────────────────────────────────────────────── page chrome
-def _on_page(canvas, doc):  # noqa: ANN001
-    canvas.saveState()
-    canvas.setFont(_BODY_FONT, 8)
-    canvas.setFillColor(_MUTED)
-    canvas.drawString(0.75 * inch, 0.5 * inch, "RiskPath Platform Guide · v0.1.0")
-    canvas.drawRightString(letter[0] - 0.75 * inch, 0.5 * inch, f"Page {doc.page}")
-    canvas.restoreState()
+_FOOTER_TEXT = "RiskPath Platform Guide · v0.1.0"
+
+
+def _make_on_page(footer: str):
+    def _on_page(canvas, doc):  # noqa: ANN001
+        canvas.saveState()
+        canvas.setFont(_BODY_FONT, 8)
+        canvas.setFillColor(_MUTED)
+        canvas.drawString(0.75 * inch, 0.5 * inch, footer)
+        canvas.drawRightString(letter[0] - 0.75 * inch, 0.5 * inch, f"Page {doc.page}")
+        canvas.restoreState()
+
+    return _on_page
 
 
 # ───────────────────────────────────────────────────────────── main
-def main() -> None:
-    if not _MD_SRC.exists():
-        raise FileNotFoundError(f"Markdown source missing at {_MD_SRC}")
+def render_pdf(md_path: Path, pdf_path: Path, *, title: str, footer: str) -> None:
+    """Render a markdown file to a PDF."""
+    if not md_path.exists():
+        raise FileNotFoundError(f"Markdown source missing at {md_path}")
 
-    md = _MD_SRC.read_text(encoding="utf-8")
+    md = md_path.read_text(encoding="utf-8")
     flowables = _parse_markdown(md)
 
-    _PDF_OUT.parent.mkdir(parents=True, exist_ok=True)
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
     doc = SimpleDocTemplate(
-        str(_PDF_OUT),
+        str(pdf_path),
         pagesize=letter,
         leftMargin=0.85 * inch,
         rightMargin=0.85 * inch,
         topMargin=0.85 * inch,
         bottomMargin=0.9 * inch,
-        title="RiskPath Platform Guide",
+        title=title,
         author="RiskPath",
-        subject="Clinical Decision-Support Platform for 30-Day Hospital Readmission Risk",
+        subject="RiskPath — Clinical Decision-Support Platform",
     )
-    doc.build(flowables, onFirstPage=_on_page, onLaterPages=_on_page)
-    size_kb = _PDF_OUT.stat().st_size / 1024
-    print(f"Wrote {_PDF_OUT.relative_to(_REPO_ROOT)} ({size_kb:.1f} KB)")
+    on_page = _make_on_page(footer)
+    doc.build(flowables, onFirstPage=on_page, onLaterPages=on_page)
+    size_kb = pdf_path.stat().st_size / 1024
+    try:
+        rel = pdf_path.relative_to(_REPO_ROOT)
+    except ValueError:
+        rel = pdf_path
+    print(f"Wrote {rel} ({size_kb:.1f} KB)")
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Render a markdown doc to PDF.")
+    parser.add_argument(
+        "--input", "-i", type=Path, default=_MD_SRC,
+        help="Input markdown file (default: docs/RISKPATH_PLATFORM_GUIDE.md)",
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, default=None,
+        help="Output PDF path (default: input path with .pdf extension)",
+    )
+    parser.add_argument(
+        "--title", "-t", type=str, default="RiskPath Platform Guide",
+        help="PDF document title (metadata + footer)",
+    )
+    args = parser.parse_args()
+
+    out = args.output or args.input.with_suffix(".pdf")
+    footer = f"{args.title} · v0.1.0" if args.input == _MD_SRC else args.title
+    render_pdf(args.input, out, title=args.title, footer=footer)
 
 
 if __name__ == "__main__":
