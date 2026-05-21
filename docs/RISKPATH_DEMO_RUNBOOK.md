@@ -168,6 +168,39 @@ Effectively nothing right now — under 5 dollars a month of cloud infrastructur
 
 ---
 
+## Technical and Infrastructure Questions
+
+These come from a CIO, CTO, or IT director in the room. Answer plainly and confidently.
+
+**Where is the backend deployed?**
+The backend runs on Railway — a managed cloud platform. It's a Python FastAPI service packaged as a Docker container, and it auto-deploys from GitHub every time we push a change. The model itself — an XGBoost classifier with SHAP explanations — is wrapped inside that service.
+
+**Where is the frontend deployed?**
+The frontend is a React application hosted on Lovable, which deploys to Cloudflare's global edge network. That's why it loads quickly from anywhere and runs on any device — including this iPad — with nothing to install.
+
+**What's the technology stack?**
+Backend is Python — FastAPI, XGBoost, and SHAP. Frontend is React with the TanStack framework. Everything is in version control on GitHub and deploys automatically on every change. It's a standard, modern, maintainable stack — nothing exotic that would lock us in or be hard to staff.
+
+**How does it scale?**
+A single prediction takes about 80 milliseconds, and a SHAP explanation about 200. It scales horizontally — we add instances as load grows. For a hospital-scale pilot, the current setup handles a full discharge census comfortably, and we can batch-score a hundred patients in about a second and a half.
+
+**Is it HIPAA-compliant and secure?**
+The current deployment is a research demo on de-identified public data, so HIPAA doesn't apply yet. For a real deployment with PHI, we'd move to a HIPAA-eligible environment under a Business Associate Agreement — Railway, AWS, Azure, and Google Cloud all offer that. The application doesn't change; only the hosting tier does.
+
+**What happens to patient data?**
+Nothing is stored. The backend is stateless — a prediction flows through and the data is discarded immediately. There's no database and no logging of patient features. That's a deliberate design choice that simplifies the privacy and security story.
+
+**Can it integrate with our EHR — Epic or Cerner?**
+Yes. At its core it's an API. Any system that can make a secure web call can send a patient record and get back a risk score and explanation. Integration through FHIR or an interface engine is a well-trodden path — it's an integration project, not a rebuild.
+
+**How long did this take to build?**
+The platform — backend, frontend, and deployment — came together in days, on top of a pre-existing, peer-reviewed research model. That's the key point: the engineering is largely done. The remaining work for a real deployment is clinical validation and EHR integration, not building from scratch.
+
+**What if it goes down — who maintains it?**
+Both services auto-restart on failure and auto-redeploy from GitHub, with health checks built in. For a production pilot we'd layer on monitoring and on-call coverage, but the foundation — version control, containerized deployments, automated health checks — is already in place.
+
+---
+
 ## If Something Breaks Mid-Demo
 
 **Blank prediction or "Offline" badge:** Say "Let me reload that," reload the page, and tap the patient again. You pre-warmed it, so this is unlikely.
