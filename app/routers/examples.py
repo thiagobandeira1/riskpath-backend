@@ -67,13 +67,18 @@ def _row_to_patient_features(row: pd.Series) -> PatientFeatures:
     "/examples",
     response_model=ExamplesResponse,
     responses=ERROR_RESPONSES,
-    summary="Anonymized example patient rows for demo loading",
+    summary="Curated example patient rows for demo loading",
     description=(
-        "Returns N anonymized rows drawn from the local V7 parquet, each "
-        "shaped for direct POST to /predictions or /explanations. All 5 "
-        "ID_COLS (subject_id, hadm_id, admittime_dt, dischtime_dt, "
-        "insurance) are stripped — never read into process memory in the "
-        "first place. Bounded N <= 100."
+        "Returns the first N rows of the curated demo pool, each shaped for "
+        "direct POST to /predictions or /explanations. The pool is a hand-"
+        "picked, ORDERED set of anonymized patients spanning the risk "
+        "spectrum from very-low to very-high (see scripts/"
+        "curate_demo_patients.py), so demo cards read left-to-right from "
+        "lowest to highest risk. Order is preserved (head, not random "
+        "sample). All 5 ID_COLS (subject_id, hadm_id, admittime_dt, "
+        "dischtime_dt, insurance) are stripped — never read into process "
+        "memory in the first place. Bounded N <= 100; if N exceeds the pool "
+        "size, all available rows are returned."
     ),
 )
 def examples(
@@ -87,6 +92,9 @@ def examples(
     ] = 5,
 ) -> ExamplesResponse:
     pool = _load_examples_pool()
-    sample = pool.sample(n=n, random_state=42).reset_index(drop=True)
-    examples_list = [_row_to_patient_features(sample.iloc[i]) for i in range(len(sample))]
-    return ExamplesResponse(examples=examples_list, n=n)
+    # head(n), NOT sample(): the curated pool is intentionally ordered
+    # low-risk -> high-risk, and we want the demo cards in that order.
+    selected = pool.head(n).reset_index(drop=True)
+    examples_list = [_row_to_patient_features(selected.iloc[i]) for i in range(len(selected))]
+    # Report the actual count returned (may be < n if the pool is smaller).
+    return ExamplesResponse(examples=examples_list, n=len(examples_list))
